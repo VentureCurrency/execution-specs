@@ -1,6 +1,6 @@
 import json
 import os
-from typing import List, Sequence, Tuple, Union
+from typing import List, Sequence, Tuple
 
 import pytest
 from ethereum_rlp import Extended, rlp
@@ -17,9 +17,7 @@ ETHEREUM_TESTS_PATH = TEST_FIXTURES["ethereum_tests"]["fixture_path"]
 #
 
 
-def convert_to_rlp_native(
-    obj: Union[str, int, Sequence[Union[str, int]]]
-) -> Extended:
+def convert_to_rlp_native(obj: str | int | Sequence[str | int]) -> Extended:
     if isinstance(obj, str):
         return bytes(obj, "utf-8")
     elif isinstance(obj, int):
@@ -67,22 +65,22 @@ def test_ethtest_fixtures_for_rlp_encoding(
 
 
 @pytest.mark.parametrize(
-    "raw_data, encoded_data",
+    "_raw_data, encoded_data",
     ethtest_fixtures_as_pytest_fixtures("RandomRLPTests/example.json"),
 )
 def test_ethtest_fixtures_for_successfully_rlp_decoding(
-    raw_data: Bytes, encoded_data: Bytes
+    _raw_data: Extended, encoded_data: Bytes
 ) -> None:
     decoded_data = rlp.decode(encoded_data)
     assert rlp.encode(decoded_data) == encoded_data
 
 
 @pytest.mark.parametrize(
-    "raw_data, encoded_data",
+    "_raw_data, encoded_data",
     ethtest_fixtures_as_pytest_fixtures("invalidRLPTest.json"),
 )
 def test_ethtest_fixtures_for_fails_in_rlp_decoding(
-    raw_data: Bytes, encoded_data: Bytes
+    _raw_data: Bytes, encoded_data: Bytes
 ) -> None:
     with pytest.raises(rlp.DecodingError):
         rlp.decode(encoded_data)

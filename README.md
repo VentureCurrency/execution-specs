@@ -1,6 +1,7 @@
 # Ethereum Execution Client Specifications
 
 [![GitPOAP Badge](https://public-api.gitpoap.io/v1/repo/ethereum/execution-specs/badge)](https://www.gitpoap.io/gh/ethereum/execution-specs)
+[![codecov](https://codecov.io/gh/ethereum/execution-specs/graph/badge.svg?token=0LQZO56RTM)](https://codecov.io/gh/ethereum/execution-specs)
 
 ## Description
 
@@ -10,7 +11,8 @@ This repository contains the specifications related to the Ethereum execution cl
 
 | Version and Code Name | Block No. | Released | Incl EIPs | Specs | Blog |
 |-----------------------|-----------|----------|-----------|-------|-------|
-| Cancun | 19426587 | 2024-03-13<br />(1710338135) | [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153) </br> [EIP-4788](https://eips.ethereum.org/EIPS/eip-4788)</br> [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844)</br> [EIP-5656](https://eips.ethereum.org/EIPS/eip-5656)</br> [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780)</br> [EIP-7516](https://eips.ethereum.org/EIPS/eip-7516)| [Specification](https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md) | [Blog](https://blog.ethereum.org/2024/02/27/dencun-mainnet-announcement) |
+| Prague | 22431084 | 2025-05-07 | [EIP-2537] <br> [EIP-2935] <br> [EIP-6110] <br> [EIP-7002] <br> [EIP-7251] <br> [EIP-7549] <br> [EIP-7623] <br> [EIP-7685] <br> [EIP-7691] <br> [EIP-7702] | [Specs](https://eips.ethereum.org/EIPS/eip-7600) | [Blog](https://blog.ethereum.org/2025/04/23/pectra-mainnet) |
+| Cancun | 19426587 | 2024-03-13<br />(1710338135) | [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153) </br> [EIP-4788](https://eips.ethereum.org/EIPS/eip-4788)</br> [EIP-4844](https://eips.ethereum.org/EIPS/eip-4844)</br> [EIP-5656](https://eips.ethereum.org/EIPS/eip-5656)</br> [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780) </br> [EIP-7044](https://eips.ethereum.org/EIPS/eip-7044) </br> [EIP-7045](https://eips.ethereum.org/EIPS/eip-7045) </br> [EIP-7514](https://eips.ethereum.org/EIPS/eip-7514) </br> [EIP-7516](https://eips.ethereum.org/EIPS/eip-7516)| [Specification](https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md) | [Blog](https://blog.ethereum.org/2024/02/27/dencun-mainnet-announcement) |
 | Shanghai | 17034870 | 2023-04-12<br/>(1681338455) | [EIP-3651](https://eips.ethereum.org/EIPS/eip-3651) <br/> [EIP-3855](https://eips.ethereum.org/EIPS/eip-3855) <br/> [EIP-3860](https://eips.ethereum.org/EIPS/eip-3860) <br/> [EIP-4895](https://eips.ethereum.org/EIPS/eip-4895) | [Specification](https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md) | [Blog](https://blog.ethereum.org/2023/03/28/shapella-mainnet-announcement) |
 | Paris | 15537394 | 2022-09-15 | [EIP-3675](https://eips.ethereum.org/EIPS/eip-3675) <br/> [EIP-4399](https://eips.ethereum.org/EIPS/eip-4399) | [Specification](https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/paris.md) | [Blog](https://blog.ethereum.org/2022/08/24/mainnet-merge-announcement) |
 | Gray Glacier | 15050000 | 2022-06-30 | [EIP-5133](https://eips.ethereum.org/EIPS/eip-5133) | [Specification](./network-upgrades/mainnet-upgrades/gray-glacier.md) | [Blog](https://blog.ethereum.org/2022/06/16/gray-glacier-announcement/) |
@@ -32,6 +34,18 @@ This repository contains the specifications related to the Ethereum execution cl
 
 *Note:* Starting with Paris, updates are no longer rolled out based on block numbers. Paris was enabled once proof-of-work Total Difficulty reached 58750000000000000000000. As of Shanghai (at 1681338455), upgrade activation is based on timestamps.
 
+
+[EIP-2537]: https://eips.ethereum.org/EIPS/eip-2537
+[EIP-2935]: https://eips.ethereum.org/EIPS/eip-2935
+[EIP-6110]: https://eips.ethereum.org/EIPS/eip-6110
+[EIP-7002]: https://eips.ethereum.org/EIPS/eip-7002
+[EIP-7251]: https://eips.ethereum.org/EIPS/eip-7251
+[EIP-7549]: https://eips.ethereum.org/EIPS/eip-7549
+[EIP-7623]: https://eips.ethereum.org/EIPS/eip-7623
+[EIP-7685]: https://eips.ethereum.org/EIPS/eip-7685
+[EIP-7691]: https://eips.ethereum.org/EIPS/eip-7691
+[EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702
+
 Some clarifications were enabled without protocol releases:
 
 | EIP | Block No. |
@@ -39,7 +53,7 @@ Some clarifications were enabled without protocol releases:
 | [EIP-2681](https://eips.ethereum.org/EIPS/eip-2681) | 0 |
 | [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) | 0 |
 | [EIP-7523](https://eips.ethereum.org/EIPS/eip-7523) | 15537394 |
-| [EIP-7610](https://github.com/ethereum/EIPs/pull/8161) | 0 |
+| [EIP-7610](https://eips.ethereum.org/EIPS/eip-7610) | 0 |
 
 
 ## Execution Specification (work-in-progress)
@@ -52,7 +66,7 @@ The execution specification is a python implementation of Ethereum that prioriti
 
 The Ethereum specification is maintained as a Python library, for better integration with tooling and testing.
 
-Requires Python 3.10+
+Requires Python 3.11+
 
 ### Building
 

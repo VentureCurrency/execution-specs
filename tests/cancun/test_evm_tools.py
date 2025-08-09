@@ -3,40 +3,54 @@ from typing import Dict
 
 import pytest
 
-from tests.helpers import TEST_FIXTURES
+from tests.helpers import EEST_TESTS_PATH, ETHEREUM_TESTS_PATH
 from tests.helpers.load_evm_tools_tests import (
     fetch_evm_tools_tests,
     idfn,
     load_evm_tools_test,
 )
 
-ETHEREUM_TESTS_PATH = TEST_FIXTURES["ethereum_tests"]["fixture_path"]
-TEST_DIR = f"{ETHEREUM_TESTS_PATH}/GeneralStateTests/"
+ETHEREUM_STATE_TESTS_DIR = f"{ETHEREUM_TESTS_PATH}/GeneralStateTests/"
+EEST_STATE_TESTS_DIR = f"{EEST_TESTS_PATH}/state_tests/"
 FORK_NAME = "Cancun"
 
-run_evm_tools_test = partial(
+SLOW_TESTS = (
+    "GeneralStateTests/stTimeConsuming/CALLBlake2f_MaxRounds.json::CALLBlake2f_MaxRounds-fork_[Cancun-Prague]-d0g0v0",
+    "GeneralStateTests/VMTests/vmPerformance/loopExp.json::loopExp-fork_[Cancun-Prague]-d[0-14]g0v0",
+    "GeneralStateTests/VMTests/vmPerformance/loopMul.json::loopMul-fork_[Cancun-Prague]-d[0-2]g0v0",
+)
+
+
+# Define tests
+fetch_tests = partial(
+    fetch_evm_tools_tests,
+    fork_name=FORK_NAME,
+    slow_tests=SLOW_TESTS,
+)
+
+run_tests = partial(
     load_evm_tools_test,
     fork_name=FORK_NAME,
 )
 
-SLOW_TESTS = (
-    "CALLBlake2f_MaxRounds",
-    "CALLCODEBlake2f",
-    "CALLBlake2f",
-    "loopExp",
-    "loopMul",
-)
 
-
+# Run tests from ethereum/tests
 @pytest.mark.evm_tools
 @pytest.mark.parametrize(
     "test_case",
-    fetch_evm_tools_tests(
-        TEST_DIR,
-        FORK_NAME,
-        SLOW_TESTS,
-    ),
+    fetch_tests(ETHEREUM_STATE_TESTS_DIR),
     ids=idfn,
 )
-def test_evm_tools(test_case: Dict) -> None:
-    run_evm_tools_test(test_case)
+def test_ethereum_tests_evm_tools(test_case: Dict) -> None:
+    run_tests(test_case)
+
+
+# Run EEST test fixtures
+@pytest.mark.evm_tools
+@pytest.mark.parametrize(
+    "test_case",
+    fetch_tests(EEST_STATE_TESTS_DIR),
+    ids=idfn,
+)
+def test_eest_evm_tools(test_case: Dict) -> None:
+    run_tests(test_case)

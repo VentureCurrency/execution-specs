@@ -4,7 +4,6 @@ submitted to be executed. If Ethereum is viewed as a state machine,
 transactions are the events that move between states.
 """
 from dataclasses import dataclass
-from typing import Union
 
 from ethereum_rlp import rlp
 from ethereum_types.bytes import Bytes, Bytes0
@@ -13,14 +12,34 @@ from ethereum_types.numeric import U64, U256, Uint
 
 from ethereum.crypto.elliptic_curve import SECP256K1N, secp256k1_recover
 from ethereum.crypto.hash import Hash32, keccak256
-from ethereum.exceptions import InvalidSignatureError
+from ethereum.exceptions import (
+    InsufficientTransactionGasError,
+    InvalidSignatureError,
+    NonceOverflowError,
+)
 
 from .fork_types import Address
 
-TX_BASE_COST = 21000
-TX_DATA_COST_PER_NON_ZERO = 16
-TX_DATA_COST_PER_ZERO = 4
-TX_CREATE_COST = 32000
+TX_BASE_COST = Uint(21000)
+"""
+Base cost of a transaction in gas units. This is the minimum amount of gas
+required to execute a transaction.
+"""
+
+TX_DATA_COST_PER_NON_ZERO = Uint(16)
+"""
+Gas cost per non-zero byte in the transaction data.
+"""
+
+TX_DATA_COST_PER_ZERO = Uint(4)
+"""
+Gas cost per zero byte in the transaction data.
+"""
+
+TX_CREATE_COST = Uint(32000)
+"""
+Additional gas cost for creating a new contract.
+"""
 
 
 @slotted_freezable
@@ -31,17 +50,54 @@ class Transaction:
     """
 
     nonce: U256
+    """
+    A scalar value equal to the number of transactions sent by the sender.
+    """
+
     gas_price: Uint
+    """
+    The price of gas for this transaction, in wei.
+    """
+
     gas: Uint
-    to: Union[Bytes0, Address]
+    """
+    The maximum amount of gas that can be used by this transaction.
+    """
+
+    to: Bytes0 | Address
+    """
+    The address of the recipient. If empty, the transaction is a contract
+    creation.
+    """
+
     value: U256
+    """
+    The amount of ether (in wei) to send with this transaction.
+    """
+
     data: Bytes
+    """
+    The data payload of the transaction, which can be used to call functions
+    on contracts or to create new contracts.
+    """
+
     v: U256
+    """
+    The recovery id of the signature.
+    """
+
     r: U256
+    """
+    The first part of the signature.
+    """
+
     s: U256
+    """
+    The second part of the signature.
+    """
 
 
-def validate_transaction(tx: Transaction) -> bool:
+def validate_transaction(tx: Transaction) -> Uint:
     """
     Verifies a transaction.
 
@@ -50,27 +106,26 @@ def validate_transaction(tx: Transaction) -> bool:
     be possible to execute a transaction and it will be declared invalid.
 
     Additionally, the nonce of a transaction must not equal or exceed the
-    limit defined in `EIP-2681 <https://eips.ethereum.org/EIPS/eip-2681>`_.
+    limit defined in [EIP-2681].
     In practice, defining the limit as ``2**64-1`` has no impact because
     sending ``2**64-1`` transactions is improbable. It's not strictly
     impossible though, ``2**64-1`` transactions is the entire capacity of the
     Ethereum blockchain at 2022 gas limits for a little over 22 years.
 
-    Parameters
-    ----------
-    tx :
-        Transaction to validate.
+    This function takes a transaction as a parameter and returns the intrinsic
+    gas cost of the transaction after validation. It throws an
+    `InsufficientTransactionGasError` exception if the transaction does not
+    provide enough gas to cover the intrinsic cost, and a `NonceOverflowError`
+    exception if the nonce is greater than `2**64 - 2`.
 
-    Returns
-    -------
-    verified : `bool`
-        True if the transaction can be executed, or False otherwise.
+    [EIP-2681]: https://eips.ethereum.org/EIPS/eip-2681
     """
-    if calculate_intrinsic_cost(tx) > Uint(tx.gas):
-        return False
-    if tx.nonce >= U256(U64.MAX_VALUE):
-        return False
-    return True
+    intrinsic_gas = calculate_intrinsic_cost(tx)
+    if intrinsic_gas > tx.gas:
+        raise InsufficientTransactionGasError("Insufficient gas")
+    if U256(tx.nonce) >= U256(U64.MAX_VALUE):
+        raise NonceOverflowError("Nonce too high")
+    return intrinsic_gas
 
 
 def calculate_intrinsic_cost(tx: Transaction) -> Uint:
@@ -86,17 +141,15 @@ def calculate_intrinsic_cost(tx: Transaction) -> Uint:
     intrinsic cost must be calculated and paid for before execution in order
     for all operations to be implemented.
 
-    Parameters
-    ----------
-    tx :
-        Transaction to compute the intrinsic cost of.
+    The intrinsic cost includes:
+    1. Base cost (`TX_BASE_COST`)
+    2. Cost for data (zero and non-zero bytes)
+    3. Cost for contract creation (if applicable)
 
-    Returns
-    -------
-    verified : `ethereum.base_types.Uint`
-        The intrinsic cost of the transaction.
+    This function takes a transaction as a parameter and returns the intrinsic
+    gas cost of the transaction.
     """
-    data_cost = 0
+    data_cost = Uint(0)
 
     for byte in tx.data:
         if byte == 0:
@@ -107,9 +160,9 @@ def calculate_intrinsic_cost(tx: Transaction) -> Uint:
     if tx.to == Bytes0(b""):
         create_cost = TX_CREATE_COST
     else:
-        create_cost = 0
+        create_cost = Uint(0)
 
-    return Uint(TX_BASE_COST + data_cost + create_cost)
+    return TX_BASE_COST + data_cost + create_cost
 
 
 def recover_sender(chain_id: U64, tx: Transaction) -> Address:
@@ -122,17 +175,9 @@ def recover_sender(chain_id: U64, tx: Transaction) -> Address:
     signing hash of the transaction. The sender's public key can be obtained
     with these two values and therefore the sender address can be retrieved.
 
-    Parameters
-    ----------
-    tx :
-        Transaction of interest.
-    chain_id :
-        ID of the executing chain.
-
-    Returns
-    -------
-    sender : `ethereum.fork_types.Address`
-        The address of the account that signed the transaction.
+    This function takes chain_id and a transaction as parameters and returns
+    the address of the sender of the transaction. It raises an
+    `InvalidSignatureError` if the signature values (r, s, v) are invalid.
     """
     v, r, s = tx.v, tx.r, tx.s
     if U256(0) >= r or r >= SECP256K1N:
@@ -151,22 +196,19 @@ def recover_sender(chain_id: U64, tx: Transaction) -> Address:
         public_key = secp256k1_recover(
             r, s, v - U256(35) - chain_id_x2, signing_hash_155(tx, chain_id)
         )
+
     return Address(keccak256(public_key)[12:32])
 
 
 def signing_hash_pre155(tx: Transaction) -> Hash32:
     """
-    Compute the hash of a transaction used in a legacy (pre EIP 155) signature.
+    Compute the hash of a transaction used in a legacy (pre [EIP-155])
+    signature.
 
-    Parameters
-    ----------
-    tx :
-        Transaction of interest.
+    This function takes a transaction as a parameter and returns the
+    signing hash of the transaction.
 
-    Returns
-    -------
-    hash : `ethereum.crypto.hash.Hash32`
-        Hash of the transaction.
+    [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
     """
     return keccak256(
         rlp.encode(
@@ -184,19 +226,12 @@ def signing_hash_pre155(tx: Transaction) -> Hash32:
 
 def signing_hash_155(tx: Transaction, chain_id: U64) -> Hash32:
     """
-    Compute the hash of a transaction used in a EIP 155 signature.
+    Compute the hash of a transaction used in a [EIP-155] signature.
 
-    Parameters
-    ----------
-    tx :
-        Transaction of interest.
-    chain_id :
-        The id of the current chain.
+    This function takes a transaction and chain ID as parameters and returns
+    the hash of the transaction used in a [EIP-155] signature.
 
-    Returns
-    -------
-    hash : `ethereum.crypto.hash.Hash32`
-        Hash of the transaction.
+    [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
     """
     return keccak256(
         rlp.encode(
@@ -213,3 +248,13 @@ def signing_hash_155(tx: Transaction, chain_id: U64) -> Hash32:
             )
         )
     )
+
+
+def get_transaction_hash(tx: Transaction) -> Hash32:
+    """
+    Compute the hash of a transaction.
+
+    This function takes a transaction as a parameter and returns the
+    hash of the transaction.
+    """
+    return keccak256(rlp.encode(tx))

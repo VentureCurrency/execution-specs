@@ -12,12 +12,14 @@ Bytes64
 Bytes8
 Bytes256
 Bytes0
+calldata
 copyreg
 copytree
 coinbase
 coincurve
 crypto
 E501
+EIP
 encodings
 endian
 eth
@@ -40,6 +42,7 @@ keccak
 keccak256
 keccak512
 linter
+lru
 mutable256
 mainnet
 memoize
@@ -64,6 +67,8 @@ U8
 ulen
 secp256k1
 secp256k1n
+secp256k1p
+secp256k1b
 statetest
 subclasses
 iadd
@@ -376,6 +381,7 @@ sublist
 
 x00
 codehash
+hashable
 
 randao
 prevrandao
@@ -442,11 +448,18 @@ BLS12
 ECC
 G1
 FQ
+FQP
 Point2
+Point3
+Point3D
+3d
 msm
 G2
 FQ2
 coeffs
+coord0
+coord1
+coords
 b2
 FQ12
 
@@ -458,3 +471,9 @@ exponentiate
 monomial
 impl
 x2
+
+eoa
+
+blockchain
+listdir
+precompiles

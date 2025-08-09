@@ -26,13 +26,23 @@ This specification aims to be:
 - Avoid using EIP numbers in identifiers.
 - If necessary, there is a custom dictionary `whitelist.txt`. 
 
+### Changes across various Forks
 
+Many contributions require changes across multiple forks, organized under `src/ethereum/*`. When making such changes, please ensure that differences between the forks are minimal and consist only of necessary differences. This will help with getting cleaner [diff outputs](https://ethereum.github.io/execution-specs/diffs/index.html).
+
+When creating pull requests affecting multiple forks, we recommended submitting your PR in two steps:
+
+1. Apply the changes on a single fork, open a _draft_ pull request, and get feedback; then
+2. Apply the changes across the other forks, push them, and mark the pull request as ready for review.
+
+This saves you having to apply code review feedback repeatedly for each fork.
+ 
 ### Development
 
 Running the tests necessary to merge into the repository requires:
 
- * Python 3.10.x, and
- * [PyPy 7.3.12](https://www.pypy.org/) or later.
+ * Python 3.11.x, and
+ * [PyPy](https://www.pypy.org/) [7.3.19](https://downloads.python.org/pypy/) or later.
  * `geth` installed and present in `$PATH`
 
 

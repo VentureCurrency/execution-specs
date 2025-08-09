@@ -18,7 +18,9 @@ See [EIP-3155] for more details on EVM traces.
 
 import enum
 from dataclasses import dataclass
-from typing import Optional, Protocol, Union
+from typing import Optional, Protocol
+
+from ethereum_types.bytes import Bytes
 
 from ethereum.exceptions import EthereumException
 
@@ -41,7 +43,7 @@ class TransactionEnd:
     Total gas consumed by this transaction.
     """
 
-    output: bytes
+    output: Bytes
     """
     Return value or revert reason of the outermost frame of execution.
     """
@@ -64,7 +66,7 @@ class PrecompileStart:
     Trace event that is triggered before executing a precompile.
     """
 
-    address: bytes
+    address: Bytes
     """
     Precompile that is about to be executed.
     """
@@ -149,17 +151,17 @@ class GasAndRefund:
     """
 
 
-TraceEvent = Union[
-    TransactionStart,
-    TransactionEnd,
-    PrecompileStart,
-    PrecompileEnd,
-    OpStart,
-    OpEnd,
-    OpException,
-    EvmStop,
-    GasAndRefund,
-]
+TraceEvent = (
+    TransactionStart
+    | TransactionEnd
+    | PrecompileStart
+    | PrecompileEnd
+    | OpStart
+    | OpEnd
+    | OpException
+    | EvmStop
+    | GasAndRefund
+)
 """
 All possible types of events that an [`EvmTracer`] is expected to handle.
 
@@ -168,11 +170,11 @@ All possible types of events that an [`EvmTracer`] is expected to handle.
 
 
 def discard_evm_trace(
-    evm: object,
-    event: TraceEvent,
-    trace_memory: bool = False,
-    trace_stack: bool = True,
-    trace_return_data: bool = False,
+    evm: object,  # noqa: U100
+    event: TraceEvent,  # noqa: U100
+    trace_memory: bool = False,  # noqa: U100
+    trace_stack: bool = True,  # noqa: U100
+    trace_return_data: bool = False,  # noqa: U100
 ) -> None:
     """
     An [`EvmTracer`] that discards all events.
@@ -198,9 +200,9 @@ class EvmTracer(Protocol):
         evm: object,
         event: TraceEvent,
         /,
-        trace_memory: bool = False,
-        trace_stack: bool = True,
-        trace_return_data: bool = False,
+        trace_memory: bool = False,  # noqa: U100
+        trace_stack: bool = True,  # noqa: U100
+        trace_return_data: bool = False,  # noqa: U100
     ) -> None:
         """
         Call `self` as a function, recording a trace event.
@@ -226,9 +228,44 @@ class EvmTracer(Protocol):
         """
 
 
-evm_trace: EvmTracer = discard_evm_trace
+_evm_trace: EvmTracer = discard_evm_trace
 """
 Active [`EvmTracer`] that is used for generating traces.
 
 [`EvmTracer`]: ref:ethereum.trace.EvmTracer
 """
+
+
+def set_evm_trace(tracer: EvmTracer) -> EvmTracer:
+    """
+    Change the active [`EvmTracer`] that is used for generating traces.
+
+    [`EvmTracer`]: ref:ethereum.trace.EvmTracer
+    """
+    global _evm_trace
+    old = _evm_trace
+    _evm_trace = tracer
+    return old
+
+
+def evm_trace(
+    evm: object,
+    event: TraceEvent,
+    /,
+    trace_memory: bool = False,
+    trace_stack: bool = True,
+    trace_return_data: bool = False,
+) -> None:
+    """
+    Emit a trace to the active [`EvmTracer`].
+
+    [`EvmTracer`]: ref:ethereum.trace.EvmTracer
+    """
+    global _evm_trace
+    _evm_trace(
+        evm,
+        event,
+        trace_memory=trace_memory,
+        trace_stack=trace_stack,
+        trace_return_data=trace_return_data,
+    )

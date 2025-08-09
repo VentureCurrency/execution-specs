@@ -35,13 +35,13 @@ class Account:
 
     nonce: Uint
     balance: U256
-    code: bytes
+    code: Bytes
 
 
 EMPTY_ACCOUNT = Account(
     nonce=Uint(0),
     balance=U256(0),
-    code=bytearray(),
+    code=b"",
 )
 
 

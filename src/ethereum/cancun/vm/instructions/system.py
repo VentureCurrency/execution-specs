@@ -11,14 +11,14 @@ Introduction
 
 Implementations of the EVM system related instructions.
 """
-from ethereum_types.bytes import Bytes0
+
+from ethereum_types.bytes import Bytes, Bytes0
 from ethereum_types.numeric import U256, Uint
 
 from ethereum.utils.numeric import ceil32
 
 from ...fork_types import Address
 from ...state import (
-    account_exists_and_is_empty,
     account_has_code_or_nonce,
     account_has_storage,
     get_account,
@@ -65,7 +65,6 @@ def generic_create(
     contract_address: Address,
     memory_start_position: U256,
     memory_size: U256,
-    init_code_gas: Uint,
 ) -> None:
     """
     Core logic used by the `CREATE*` family of opcodes.
@@ -73,7 +72,7 @@ def generic_create(
     # This import causes a circular import error
     # if it's not moved inside this method
     from ...vm.interpreter import (
-        MAX_CODE_SIZE,
+        MAX_INIT_CODE_SIZE,
         STACK_DEPTH_LIMIT,
         process_create_message,
     )
@@ -81,10 +80,8 @@ def generic_create(
     call_data = memory_read_bytes(
         evm.memory, memory_start_position, memory_size
     )
-    if len(call_data) > 2 * MAX_CODE_SIZE:
+    if len(call_data) > MAX_INIT_CODE_SIZE:
         raise OutOfGasError
-
-    evm.accessed_addresses.add(contract_address)
 
     create_message_gas = max_message_call_gas(Uint(evm.gas_left))
     evm.gas_left -= create_message_gas
@@ -93,7 +90,7 @@ def generic_create(
     evm.return_data = b""
 
     sender_address = evm.message.current_target
-    sender = get_account(evm.env.state, sender_address)
+    sender = get_account(evm.message.block_env.state, sender_address)
 
     if (
         sender.balance < endowment
@@ -104,16 +101,22 @@ def generic_create(
         push(evm.stack, U256(0))
         return
 
+    evm.accessed_addresses.add(contract_address)
+
     if account_has_code_or_nonce(
-        evm.env.state, contract_address
-    ) or account_has_storage(evm.env.state, contract_address):
-        increment_nonce(evm.env.state, evm.message.current_target)
+        evm.message.block_env.state, contract_address
+    ) or account_has_storage(evm.message.block_env.state, contract_address):
+        increment_nonce(
+            evm.message.block_env.state, evm.message.current_target
+        )
         push(evm.stack, U256(0))
         return
 
-    increment_nonce(evm.env.state, evm.message.current_target)
+    increment_nonce(evm.message.block_env.state, evm.message.current_target)
 
     child_message = Message(
+        block_env=evm.message.block_env,
+        tx_env=evm.message.tx_env,
         caller=evm.message.current_target,
         target=Bytes0(),
         gas=create_message_gas,
@@ -129,7 +132,7 @@ def generic_create(
         accessed_storage_keys=evm.accessed_storage_keys.copy(),
         parent_evm=evm,
     )
-    child_evm = process_create_message(child_message, evm.env)
+    child_evm = process_create_message(child_message)
 
     if child_evm.error:
         incorporate_child_on_error(evm, child_evm)
@@ -167,7 +170,9 @@ def create(evm: Evm) -> None:
     evm.memory += b"\x00" * extend_memory.expand_by
     contract_address = compute_contract_address(
         evm.message.current_target,
-        get_account(evm.env.state, evm.message.current_target).nonce,
+        get_account(
+            evm.message.block_env.state, evm.message.current_target
+        ).nonce,
     )
 
     generic_create(
@@ -176,7 +181,6 @@ def create(evm: Evm) -> None:
         contract_address,
         memory_start_position,
         memory_size,
-        init_code_gas,
     )
 
     # PROGRAM COUNTER
@@ -229,7 +233,6 @@ def create2(evm: Evm) -> None:
         contract_address,
         memory_start_position,
         memory_size,
-        init_code_gas,
     )
 
     # PROGRAM COUNTER
@@ -297,8 +300,10 @@ def generic_call(
     call_data = memory_read_bytes(
         evm.memory, memory_input_start_position, memory_input_size
     )
-    code = get_account(evm.env.state, code_address).code
+    code = get_account(evm.message.block_env.state, code_address).code
     child_message = Message(
+        block_env=evm.message.block_env,
+        tx_env=evm.message.tx_env,
         caller=caller,
         target=to,
         gas=gas,
@@ -314,7 +319,7 @@ def generic_call(
         accessed_storage_keys=evm.accessed_storage_keys.copy(),
         parent_evm=evm,
     )
-    child_evm = process_message(child_message, evm.env)
+    child_evm = process_message(child_message)
 
     if child_evm.error:
         incorporate_child_on_error(evm, child_evm)
@@ -366,9 +371,11 @@ def call(evm: Evm) -> None:
         evm.accessed_addresses.add(to)
         access_gas_cost = GAS_COLD_ACCOUNT_ACCESS
 
+    code_address = to
+
     create_gas_cost = (
         Uint(0)
-        if is_account_alive(evm.env.state, to) or value == 0
+        if is_account_alive(evm.message.block_env.state, to) or value == 0
         else GAS_NEW_ACCOUNT
     )
     transfer_gas_cost = Uint(0) if value == 0 else GAS_CALL_VALUE
@@ -384,20 +391,20 @@ def call(evm: Evm) -> None:
         raise WriteInStaticContext
     evm.memory += b"\x00" * extend_memory.expand_by
     sender_balance = get_account(
-        evm.env.state, evm.message.current_target
+        evm.message.block_env.state, evm.message.current_target
     ).balance
     if sender_balance < value:
         push(evm.stack, U256(0))
         evm.return_data = b""
-        evm.gas_left += message_call_gas.stipend
+        evm.gas_left += message_call_gas.sub_call
     else:
         generic_call(
             evm,
-            message_call_gas.stipend,
+            message_call_gas.sub_call,
             value,
             evm.message.current_target,
             to,
-            to,
+            code_address,
             True,
             False,
             memory_input_start_position,
@@ -458,16 +465,16 @@ def callcode(evm: Evm) -> None:
     # OPERATION
     evm.memory += b"\x00" * extend_memory.expand_by
     sender_balance = get_account(
-        evm.env.state, evm.message.current_target
+        evm.message.block_env.state, evm.message.current_target
     ).balance
     if sender_balance < value:
         push(evm.stack, U256(0))
         evm.return_data = b""
-        evm.gas_left += message_call_gas.stipend
+        evm.gas_left += message_call_gas.sub_call
     else:
         generic_call(
             evm,
-            message_call_gas.stipend,
+            message_call_gas.sub_call,
             value,
             evm.message.current_target,
             to,
@@ -503,8 +510,11 @@ def selfdestruct(evm: Evm) -> None:
         gas_cost += GAS_COLD_ACCOUNT_ACCESS
 
     if (
-        not is_account_alive(evm.env.state, beneficiary)
-        and get_account(evm.env.state, evm.message.current_target).balance != 0
+        not is_account_alive(evm.message.block_env.state, beneficiary)
+        and get_account(
+            evm.message.block_env.state, evm.message.current_target
+        ).balance
+        != 0
     ):
         gas_cost += GAS_SELF_DESTRUCT_NEW_ACCOUNT
 
@@ -513,10 +523,12 @@ def selfdestruct(evm: Evm) -> None:
         raise WriteInStaticContext
 
     originator = evm.message.current_target
-    originator_balance = get_account(evm.env.state, originator).balance
+    originator_balance = get_account(
+        evm.message.block_env.state, originator
+    ).balance
 
     move_ether(
-        evm.env.state,
+        evm.message.block_env.state,
         originator,
         beneficiary,
         originator_balance,
@@ -524,15 +536,11 @@ def selfdestruct(evm: Evm) -> None:
 
     # register account for deletion only if it was created
     # in the same transaction
-    if originator in evm.env.state.created_accounts:
+    if originator in evm.message.block_env.state.created_accounts:
         # If beneficiary is the same as originator, then
         # the ether is burnt.
-        set_account_balance(evm.env.state, originator, U256(0))
+        set_account_balance(evm.message.block_env.state, originator, U256(0))
         evm.accounts_to_delete.add(originator)
-
-    # mark beneficiary as touched
-    if account_exists_and_is_empty(evm.env.state, beneficiary):
-        evm.touched_accounts.add(beneficiary)
 
     # HALT the execution
     evm.running = False
@@ -582,7 +590,7 @@ def delegatecall(evm: Evm) -> None:
     evm.memory += b"\x00" * extend_memory.expand_by
     generic_call(
         evm,
-        message_call_gas.stipend,
+        message_call_gas.sub_call,
         evm.message.value,
         evm.message.caller,
         evm.message.current_target,
@@ -631,6 +639,8 @@ def staticcall(evm: Evm) -> None:
         evm.accessed_addresses.add(to)
         access_gas_cost = GAS_COLD_ACCOUNT_ACCESS
 
+    code_address = to
+
     message_call_gas = calculate_message_call_gas(
         U256(0),
         gas,
@@ -644,11 +654,11 @@ def staticcall(evm: Evm) -> None:
     evm.memory += b"\x00" * extend_memory.expand_by
     generic_call(
         evm,
-        message_call_gas.stipend,
+        message_call_gas.sub_call,
         U256(0),
         evm.message.current_target,
         to,
-        to,
+        code_address,
         True,
         True,
         memory_input_start_position,
@@ -684,8 +694,8 @@ def revert(evm: Evm) -> None:
     # OPERATION
     evm.memory += b"\x00" * extend_memory.expand_by
     output = memory_read_bytes(evm.memory, memory_start_index, size)
-    evm.output = bytes(output)
+    evm.output = Bytes(output)
     raise Revert
 
     # PROGRAM COUNTER
-    pass
+    # no-op

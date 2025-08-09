@@ -26,15 +26,14 @@ from typing import (
     Sequence,
     Tuple,
     TypeVar,
-    Union,
+    assert_type,
     cast,
 )
 
-from ethereum_rlp import rlp
+from ethereum_rlp import Extended, rlp
 from ethereum_types.bytes import Bytes
 from ethereum_types.frozen import slotted_freezable
 from ethereum_types.numeric import U256, Uint
-from typing_extensions import assert_type
 
 from ethereum.crypto.hash import keccak256
 from ethereum.paris import trie as previous_trie
@@ -63,18 +62,25 @@ EMPTY_TRIE_ROOT = Root(
     )
 )
 
-Node = Union[
-    Account, Bytes, LegacyTransaction, Receipt, Uint, U256, Withdrawal, None
-]
+Node = (
+    Account
+    | Bytes
+    | LegacyTransaction
+    | Receipt
+    | Uint
+    | U256
+    | Withdrawal
+    | None
+)
 K = TypeVar("K", bound=Bytes)
 V = TypeVar(
     "V",
     Optional[Account],
     Optional[Bytes],
     Bytes,
-    Optional[Union[LegacyTransaction, Bytes]],
-    Optional[Union[Receipt, Bytes]],
-    Optional[Union[Withdrawal, Bytes]],
+    Optional[LegacyTransaction | Bytes],
+    Optional[Receipt | Bytes],
+    Optional[Withdrawal | Bytes],
     Uint,
     U256,
 )
@@ -86,7 +92,7 @@ class LeafNode:
     """Leaf node in the Merkle Trie"""
 
     rest_of_key: Bytes
-    value: rlp.Extended
+    value: Extended
 
 
 @slotted_freezable
@@ -95,26 +101,26 @@ class ExtensionNode:
     """Extension node in the Merkle Trie"""
 
     key_segment: Bytes
-    subnode: rlp.Extended
+    subnode: Extended
 
 
 BranchSubnodes = Tuple[
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
-    rlp.Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
+    Extended,
 ]
 
 
@@ -124,13 +130,13 @@ class BranchNode:
     """Branch node in the Merkle Trie"""
 
     subnodes: BranchSubnodes
-    value: rlp.Extended
+    value: Extended
 
 
-InternalNode = Union[LeafNode, ExtensionNode, BranchNode]
+InternalNode = LeafNode | ExtensionNode | BranchNode
 
 
-def encode_internal_node(node: Optional[InternalNode]) -> rlp.Extended:
+def encode_internal_node(node: Optional[InternalNode]) -> Extended:
     """
     Encodes a Merkle Trie node into its RLP form. The RLP will then be
     serialized into a `Bytes` and hashed unless it is less that 32 bytes
@@ -146,10 +152,10 @@ def encode_internal_node(node: Optional[InternalNode]) -> rlp.Extended:
 
     Returns
     -------
-    encoded : `rlp.Extended`
+    encoded : `Extended`
         The node encoded as RLP.
     """
-    unencoded: rlp.Extended
+    unencoded: Extended
     if node is None:
         unencoded = b""
     elif isinstance(node, LeafNode):
@@ -489,6 +495,6 @@ def patricialize(
         for k in range(16)
     )
     return BranchNode(
-        cast(BranchSubnodes, assert_type(subnodes, Tuple[rlp.Extended, ...])),
+        cast(BranchSubnodes, assert_type(subnodes, Tuple[Extended, ...])),
         value,
     )

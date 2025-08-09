@@ -36,6 +36,7 @@ class Env:
     block_gas_limit: Uint
     block_number: Uint
     block_timestamp: U256
+    parent_hash: Any
     withdrawals: Any
     block_difficulty: Optional[Uint]
     prev_randao: Optional[Bytes32]
@@ -52,6 +53,7 @@ class Env:
     parent_excess_blob_gas: Optional[U64]
     parent_blob_gas_used: Optional[U64]
     excess_blob_gas: Optional[U64]
+    requests: Any
 
     def __init__(self, t8n: "T8N", stdin: Optional[Dict] = None):
         if t8n.options.input_env == "stdin":
@@ -69,17 +71,19 @@ class Env:
         self.read_block_difficulty(data, t8n)
         self.read_base_fee_per_gas(data, t8n)
         self.read_randao(data, t8n)
-        self.read_block_hashes(data)
+        self.read_block_hashes(data, t8n)
         self.read_ommers(data, t8n)
         self.read_withdrawals(data, t8n)
 
+        self.parent_beacon_block_root = None
         if t8n.fork.is_after_fork("ethereum.cancun"):
-            parent_beacon_block_root_hex = data.get("parentBeaconBlockRoot")
-            self.parent_beacon_block_root = (
-                Bytes32(hex_to_bytes(parent_beacon_block_root_hex))
-                if parent_beacon_block_root_hex is not None
-                else None
-            )
+            if not t8n.options.state_test:
+                parent_beacon_block_root_hex = data["parentBeaconBlockRoot"]
+                self.parent_beacon_block_root = (
+                    Bytes32(hex_to_bytes(parent_beacon_block_root_hex))
+                    if parent_beacon_block_root_hex is not None
+                    else None
+                )
             self.read_excess_blob_gas(data, t8n)
 
     def read_excess_blob_gas(self, data: Any, t8n: "T8N") -> None:
@@ -230,21 +234,34 @@ class Env:
                     args.append(False)
             self.block_difficulty = t8n.fork.calculate_block_difficulty(*args)
 
-    def read_block_hashes(self, data: Any) -> None:
+    def read_block_hashes(self, data: Any, t8n: "T8N") -> None:
         """
         Read the block hashes. Returns a maximum of 256 block hashes.
         """
+        self.parent_hash = None
+        if (
+            t8n.fork.is_after_fork("ethereum.prague")
+            and not t8n.options.state_test
+        ):
+            self.parent_hash = Hash32(hex_to_bytes(data["parentHash"]))
+
         # Read the block hashes
         block_hashes: List[Any] = []
+
+        # The hex key strings provided might not have standard formatting
+        clean_block_hashes: Dict[int, Hash32] = {}
+        if "blockHashes" in data:
+            for key, value in data["blockHashes"].items():
+                int_key = int(key, 16)
+                clean_block_hashes[int_key] = Hash32(hex_to_bytes(value))
+
         # Store a maximum of 256 block hashes.
         max_blockhash_count = min(Uint(256), self.block_number)
         for number in range(
             self.block_number - max_blockhash_count, self.block_number
         ):
-            if "blockHashes" in data and str(number) in data["blockHashes"]:
-                block_hashes.append(
-                    Hash32(hex_to_bytes(data["blockHashes"][str(number)]))
-                )
+            if number in clean_block_hashes.keys():
+                block_hashes.append(clean_block_hashes[number])
             else:
                 block_hashes.append(None)
 

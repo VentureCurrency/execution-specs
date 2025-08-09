@@ -135,6 +135,7 @@ def run_test_case(
         "stdin",
         "--state.fork",
         f"{test_case.fork_name}",
+        "--state-test",
     ]
 
     if t8n_extra is not None:
@@ -146,7 +147,7 @@ def run_test_case(
         t8n_options.output_basedir = output_basedir
 
     t8n = T8N(t8n_options, out_stream, in_stream)
-    t8n.apply_body()
+    t8n.run_state_test()
     return t8n.result
 
 

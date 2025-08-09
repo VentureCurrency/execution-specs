@@ -405,7 +405,7 @@ def is_account_empty(state: State, address: Address) -> bool:
     Returns
     -------
     is_empty : `bool`
-        True if if an account has zero nonce, empty code and zero balance,
+        True if an account has zero nonce, empty code and zero balance,
         False otherwise.
     """
     account = get_account(state, address)
@@ -460,14 +460,7 @@ def is_account_alive(state: State, address: Address) -> bool:
         True if the account is alive.
     """
     account = get_account_optional(state, address)
-    if account is None:
-        return False
-    else:
-        return not (
-            account.nonce == Uint(0)
-            and account.code == b""
-            and account.balance == 0
-        )
+    return account is not None and account != EMPTY_ACCOUNT
 
 
 def modify_state(
@@ -477,6 +470,8 @@ def modify_state(
     Modify an `Account` in the `State`.
     """
     set_account(state, address, modify(get_account(state, address), f))
+    if account_exists_and_is_empty(state, address):
+        destroy_account(state, address)
 
 
 def move_ether(
@@ -521,22 +516,6 @@ def set_account_balance(state: State, address: Address, amount: U256) -> None:
         account.balance = amount
 
     modify_state(state, address, set_balance)
-
-
-def touch_account(state: State, address: Address) -> None:
-    """
-    Initializes an account to state.
-
-    Parameters
-    ----------
-    state:
-        The current state.
-
-    address:
-        The address of the account that need to initialised.
-    """
-    if not account_exists(state, address):
-        set_account(state, address, EMPTY_ACCOUNT)
 
 
 def increment_nonce(state: State, address: Address) -> None:

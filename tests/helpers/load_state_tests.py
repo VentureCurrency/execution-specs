@@ -3,7 +3,7 @@ import json
 import os.path
 import re
 from glob import glob
-from typing import Any, Dict, Generator, Tuple, Union
+from typing import Any, Dict, Generator, Tuple
 from unittest.mock import call, patch
 
 import pytest
@@ -13,7 +13,7 @@ from ethereum_rlp.exceptions import RLPException
 from ethereum_types.numeric import U64
 
 from ethereum.crypto.hash import keccak256
-from ethereum.exceptions import EthereumException
+from ethereum.exceptions import EthereumException, StateWithEmptyAccount
 from ethereum.utils.hexadecimal import hex_to_bytes
 from ethereum_spec_tools.evm_tools.loaders.fixture_loader import Load
 
@@ -46,6 +46,9 @@ def run_blockchain_st_test(test_case: Dict, load: Load) -> None:
     if hasattr(genesis_header, "withdrawals_root"):
         parameters.append(())
 
+    if hasattr(genesis_header, "requests_root"):
+        parameters.append(())
+
     genesis_block = load.fork.Block(*parameters)
 
     genesis_header_hash = hex_to_bytes(json_data["genesisBlockHeader"]["hash"])
@@ -53,9 +56,14 @@ def run_blockchain_st_test(test_case: Dict, load: Load) -> None:
     genesis_rlp = hex_to_bytes(json_data["genesisRLP"])
     assert rlp.encode(genesis_block) == genesis_rlp
 
+    try:
+        state = load.json_to_state(json_data["pre"])
+    except StateWithEmptyAccount as e:
+        pytest.xfail(str(e))
+
     chain = load.fork.BlockChain(
         blocks=[genesis_block],
-        state=load.json_to_state(json_data["pre"]),
+        state=state,
         chain_id=U64(json_data["genesisBlockHeader"].get("chainId", 1)),
     )
 
@@ -154,7 +162,7 @@ def fetch_state_test_files(
     slow_list: Tuple[str, ...] = (),
     big_memory_list: Tuple[str, ...] = (),
     ignore_list: Tuple[str, ...] = (),
-) -> Generator[Union[Dict, ParameterSet], None, None]:
+) -> Generator[Dict | ParameterSet, None, None]:
     all_slow = [re.compile(x) for x in slow_list]
     all_big_memory = [re.compile(x) for x in big_memory_list]
     all_ignore = [re.compile(x) for x in ignore_list]
@@ -168,11 +176,7 @@ def fetch_state_test_files(
             files_to_iterate.append(os.path.join(test_dir, test_path))
     else:
         # If there isn't a custom list, iterate over the test_dir
-        all_jsons = [
-            y
-            for x in os.walk(test_dir)
-            for y in glob(os.path.join(x[0], "*.json"))
-        ]
+        all_jsons = glob(os.path.join(test_dir, "**/*.json"), recursive=True)
 
         for full_path in all_jsons:
             if not any(x.search(full_path) for x in all_ignore):

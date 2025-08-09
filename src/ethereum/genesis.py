@@ -143,7 +143,7 @@ class GenesisFork(
     """
 
     Address: Type[FixedBytes]
-    Account: Callable[[Uint, U256, bytes], AccountT]
+    Account: Callable[[Uint, U256, Bytes], AccountT]
     Trie: Callable[[bool, object], TrieT]
     Bloom: Type[FixedBytes]
     Header: Type[HeaderT]
@@ -255,6 +255,9 @@ def add_genesis_block(
     if has_field(hardfork.Header, "parent_beacon_block_root"):
         fields["parent_beacon_block_root"] = Hash32(b"\0" * 32)
 
+    if has_field(hardfork.Header, "requests_hash"):
+        fields["requests_hash"] = Hash32(b"\0" * 32)
+
     genesis_header = hardfork.Header(**fields)
 
     block_fields = {
@@ -265,6 +268,9 @@ def add_genesis_block(
 
     if has_field(hardfork.Block, "withdrawals"):
         block_fields["withdrawals"] = ()
+
+    if has_field(hardfork.Block, "requests"):
+        block_fields["requests"] = ()
 
     genesis_block = hardfork.Block(**block_fields)
 

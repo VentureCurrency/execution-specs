@@ -69,9 +69,9 @@ GAS_BLOBHASH_OPCODE = Uint(3)
 GAS_POINT_EVALUATION = Uint(50000)
 
 TARGET_BLOB_GAS_PER_BLOCK = U64(393216)
-GAS_PER_BLOB = Uint(2**17)
+GAS_PER_BLOB = U64(2**17)
 MIN_BLOB_GASPRICE = Uint(1)
-BLOB_GASPRICE_UPDATE_FRACTION = Uint(3338477)
+BLOB_BASE_FEE_UPDATE_FRACTION = Uint(3338477)
 
 
 @dataclass
@@ -92,18 +92,19 @@ class ExtendMemory:
 @dataclass
 class MessageCallGas:
     """
-    Define the gas cost and stipend for executing the call opcodes.
+    Define the gas cost and gas given to the sub-call for
+    executing the call opcodes.
 
     `cost`: `ethereum.base_types.Uint`
-        The non-refundable portion of gas reserved for executing the
-        call opcode.
-    `stipend`: `ethereum.base_types.Uint`
+        The gas required to execute the call opcode, excludes
+        memory expansion costs.
+    `sub_call`: `ethereum.base_types.Uint`
         The portion of gas available to sub-calls that is refundable
-        if not consumed
+        if not consumed.
     """
 
     cost: Uint
-    stipend: Uint
+    sub_call: Uint
 
 
 def charge_gas(evm: Evm, amount: Uint) -> None:
@@ -200,8 +201,8 @@ def calculate_message_call_gas(
     call_stipend: Uint = GAS_CALL_STIPEND,
 ) -> MessageCallGas:
     """
-    Calculates the MessageCallGas (cost and stipend) for
-    executing call Opcodes.
+    Calculates the MessageCallGas (cost and gas made available to the sub-call)
+    for executing call Opcodes.
 
     Parameters
     ----------
@@ -300,7 +301,7 @@ def calculate_excess_blob_gas(parent_header: Header) -> U64:
         return parent_blob_gas - TARGET_BLOB_GAS_PER_BLOCK
 
 
-def calculate_total_blob_gas(tx: Transaction) -> Uint:
+def calculate_total_blob_gas(tx: Transaction) -> U64:
     """
     Calculate the total blob gas for a transaction.
 
@@ -315,9 +316,9 @@ def calculate_total_blob_gas(tx: Transaction) -> Uint:
         The total blob gas for the transaction.
     """
     if isinstance(tx, BlobTransaction):
-        return GAS_PER_BLOB * Uint(len(tx.blob_versioned_hashes))
+        return GAS_PER_BLOB * U64(len(tx.blob_versioned_hashes))
     else:
-        return Uint(0)
+        return U64(0)
 
 
 def calculate_blob_gas_price(excess_blob_gas: U64) -> Uint:
@@ -337,7 +338,7 @@ def calculate_blob_gas_price(excess_blob_gas: U64) -> Uint:
     return taylor_exponential(
         MIN_BLOB_GASPRICE,
         Uint(excess_blob_gas),
-        BLOB_GASPRICE_UPDATE_FRACTION,
+        BLOB_BASE_FEE_UPDATE_FRACTION,
     )
 
 
@@ -357,6 +358,6 @@ def calculate_data_fee(excess_blob_gas: U64, tx: Transaction) -> Uint:
     data_fee: `Uint`
         The blob data fee.
     """
-    return calculate_total_blob_gas(tx) * calculate_blob_gas_price(
+    return Uint(calculate_total_blob_gas(tx)) * calculate_blob_gas_price(
         excess_blob_gas
     )
